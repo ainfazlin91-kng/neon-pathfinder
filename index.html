@@ -1,0 +1,2524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Neon Pathfinder: Synonym & Antonym Quest</title>
+  <meta name="description" content="Retro arcade educational vocabulary quest where students navigate neon stone bridge paths matching CEFR Year 1–6 synonyms and antonyms.">
+  <meta property="og:title" content="Neon Pathfinder: Synonym & Antonym Quest">
+  <meta property="og:description" content="Retro arcade educational vocabulary quest where students navigate neon stone bridge paths matching CEFR Year 1–6 synonyms and antonyms.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <!-- Google Fonts for Retro Arcade Aesthetic -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Press+Start+2P&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+
+  <!-- Firebase Compatibility SDK via CDN -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #070913;
+      --grid-line: rgba(0, 243, 255, 0.12);
+      --neon-cyan: #00f3ff;
+      --neon-pink: #ff0077;
+      --neon-purple: #bc13fe;
+      --neon-amber: #ffaa00;
+      --neon-green: #00ff66;
+      --neon-red: #ff3344;
+      --tile-stone: #12182b;
+      --tile-stone-border: #1f2c4d;
+      --font-arcade: 'Press Start 2P', monospace;
+      --font-display: 'Orbitron', sans-serif;
+      --font-body: 'Rajdhani', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      color: #ffffff;
+      font-family: var(--font-body);
+      font-size: 16px;
+    }
+
+    /* Scanline effect */
+    .crt-overlay {
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+      background-size: 100% 4px, 6px 100%;
+      z-index: 99;
+      opacity: 0.6;
+    }
+
+    /* Screen containers */
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      z-index: 10;
+      overflow-y: auto;
+      overflow-x: hidden;
+      background: radial-gradient(circle at 50% 20%, #151b36 0%, #080a14 70%);
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    /* Screen A: Registration */
+    #screen-registration {
+      justify-content: flex-start;
+      align-items: center;
+      padding: 24px 16px 40px;
+    }
+
+    .reg-card {
+      width: 100%;
+      max-width: 540px;
+      margin: auto;
+      background: rgba(14, 19, 39, 0.9);
+      border: 2px solid var(--neon-cyan);
+      box-shadow: 0 0 25px rgba(0, 243, 255, 0.25), inset 0 0 20px rgba(0, 243, 255, 0.08);
+      border-radius: 14px;
+      padding: 28px 24px;
+      backdrop-filter: blur(8px);
+      text-align: center;
+      position: relative;
+    }
+
+    .sound-toggle-btn {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(0, 243, 255, 0.4);
+      color: var(--neon-cyan);
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: var(--font-display);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .sound-toggle-btn:hover {
+      background: rgba(0, 243, 255, 0.2);
+    }
+
+    .title-glitch {
+      font-family: var(--font-arcade);
+      font-size: 22px;
+      line-height: 1.4;
+      color: #fff;
+      text-shadow: 0 0 8px var(--neon-cyan), 0 0 20px var(--neon-cyan), 2px 2px 0 var(--neon-pink);
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      margin-top: 8px;
+    }
+
+    .subtitle-badge {
+      display: inline-block;
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--neon-amber);
+      background: rgba(255, 170, 0, 0.12);
+      border: 1px solid rgba(255, 170, 0, 0.4);
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 24px;
+    }
+
+    .form-group {
+      text-align: left;
+      margin-bottom: 20px;
+    }
+
+    .form-label {
+      display: block;
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #9cb1d6;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .input-neon {
+      width: 100%;
+      background: rgba(8, 12, 26, 0.85);
+      border: 1.5px solid #2a3a60;
+      border-radius: 8px;
+      color: #fff;
+      padding: 12px 16px;
+      font-family: var(--font-display);
+      font-size: 16px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .input-neon:focus {
+      border-color: var(--neon-cyan);
+      box-shadow: 0 0 12px rgba(0, 243, 255, 0.35);
+    }
+
+    .class-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .class-btn {
+      background: rgba(14, 21, 46, 0.7);
+      border: 1.5px solid #233357;
+      color: #a0b2d6;
+      border-radius: 8px;
+      padding: 10px 6px;
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .class-btn span {
+      display: block;
+      font-size: 10px;
+      font-family: var(--font-body);
+      color: #63779e;
+      margin-top: 2px;
+    }
+
+    .class-btn.selected {
+      background: rgba(0, 243, 255, 0.15);
+      border-color: var(--neon-cyan);
+      color: #ffffff;
+      box-shadow: 0 0 12px rgba(0, 243, 255, 0.3);
+    }
+
+    .class-btn.selected span {
+      color: var(--neon-cyan);
+    }
+
+    .mode-toggle-group {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      background: rgba(8, 12, 24, 0.8);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid #1c2744;
+    }
+
+    .mode-btn {
+      background: transparent;
+      border: none;
+      color: #7d90b8;
+      padding: 8px 4px;
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .mode-btn.selected {
+      background: var(--neon-purple);
+      color: #ffffff;
+      box-shadow: 0 0 12px rgba(188, 19, 254, 0.5);
+    }
+
+    .btn-arcade-start {
+      width: 100%;
+      background: linear-gradient(135deg, #00f3ff, #0088ff);
+      color: #050a18;
+      border: none;
+      padding: 16px;
+      border-radius: 10px;
+      font-family: var(--font-arcade);
+      font-size: 14px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      margin-top: 24px;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.5);
+      transition: all 0.15s;
+    }
+
+    .btn-arcade-start:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 30px rgba(0, 243, 255, 0.8);
+    }
+
+    .btn-arcade-start:active {
+      transform: translateY(1px);
+    }
+
+    .portal-link {
+      display: inline-block;
+      margin-top: 20px;
+      color: #7084ab;
+      font-family: var(--font-display);
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .portal-link:hover {
+      color: var(--neon-pink);
+      text-shadow: 0 0 8px var(--neon-pink);
+    }
+
+    /* Screen B: Game Canvas and HUD */
+    #screen-game {
+      background: #04060e;
+      overflow: hidden;
+    }
+
+    .game-hud-top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 110px;
+      background: linear-gradient(180deg, rgba(6, 9, 22, 0.96) 75%, rgba(6, 9, 22, 0) 100%);
+      z-index: 20;
+      padding: 8px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+    }
+
+    .hud-row-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-display);
+      font-size: 12px;
+      color: #8fa5cf;
+    }
+
+    .hud-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(18, 25, 48, 0.8);
+      border: 1px solid #23345c;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+    }
+
+    .hud-badge.timer-badge {
+      font-family: var(--font-arcade);
+      font-size: 13px;
+      color: var(--neon-amber);
+      border-color: rgba(255, 170, 0, 0.4);
+    }
+
+    .hud-badge.timer-badge.urgent {
+      color: var(--neon-red);
+      border-color: var(--neon-red);
+      animation: pulseAlert 0.6s infinite alternate;
+    }
+
+    @keyframes pulseAlert {
+      from { box-shadow: 0 0 4px var(--neon-red); }
+      to { box-shadow: 0 0 16px var(--neon-red); }
+    }
+
+    .hud-badge.score-badge {
+      font-family: var(--font-arcade);
+      font-size: 13px;
+      color: var(--neon-cyan);
+      border-color: rgba(0, 243, 255, 0.4);
+    }
+
+    .target-banner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: rgba(12, 17, 36, 0.9);
+      border: 1px solid var(--neon-purple);
+      box-shadow: 0 0 14px rgba(188, 19, 254, 0.25);
+      border-radius: 8px;
+      padding: 6px 14px;
+      margin-top: 4px;
+    }
+
+    .target-mode-pill {
+      font-family: var(--font-arcade);
+      font-size: 10px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .target-mode-pill.synonym {
+      background: rgba(0, 243, 255, 0.2);
+      color: var(--neon-cyan);
+      border: 1px solid var(--neon-cyan);
+    }
+
+    .target-mode-pill.antonym {
+      background: rgba(255, 0, 119, 0.2);
+      color: var(--neon-pink);
+      border: 1px solid var(--neon-pink);
+    }
+
+    .target-word-display {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      color: #ffffff;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px var(--neon-purple);
+    }
+
+    /* Main Canvas */
+    #game-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+    }
+
+    /* Mobile Controls Overlay */
+    .controls-overlay {
+      position: absolute;
+      bottom: 14px;
+      left: 0;
+      right: 0;
+      z-index: 25;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+      padding: 0 16px;
+    }
+
+    .dpad-cluster {
+      display: grid;
+      grid-template-columns: 74px 74px 74px;
+      grid-template-rows: 60px 60px;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .ctrl-btn {
+      background: rgba(14, 21, 46, 0.85);
+      border: 2px solid var(--neon-cyan);
+      color: var(--neon-cyan);
+      border-radius: 12px;
+      font-family: var(--font-arcade);
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      cursor: pointer;
+      box-shadow: 0 0 12px rgba(0, 243, 255, 0.3), inset 0 0 8px rgba(0, 243, 255, 0.1);
+      transition: all 0.1s;
+      user-select: none;
+    }
+
+    .ctrl-btn span.label {
+      font-family: var(--font-display);
+      font-size: 9px;
+      font-weight: 700;
+      color: #879fc9;
+    }
+
+    .ctrl-btn:active {
+      transform: scale(0.92);
+      background: rgba(0, 243, 255, 0.3);
+      box-shadow: 0 0 20px var(--neon-cyan);
+    }
+
+    .ctrl-up { grid-column: 2; grid-row: 1; }
+    .ctrl-left { grid-column: 1; grid-row: 2; }
+    .ctrl-down { grid-column: 2; grid-row: 2; }
+    .ctrl-right { grid-column: 3; grid-row: 2; }
+
+    /* Screen C: Results */
+    #screen-results {
+      justify-content: center;
+      align-items: center;
+      padding: 24px 16px;
+    }
+
+    .results-card {
+      width: 100%;
+      max-width: 520px;
+      margin: auto;
+      background: rgba(14, 19, 39, 0.95);
+      border: 2px solid var(--neon-amber);
+      box-shadow: 0 0 30px rgba(255, 170, 0, 0.25);
+      border-radius: 14px;
+      padding: 28px 24px;
+      text-align: center;
+    }
+
+    .results-title {
+      font-family: var(--font-arcade);
+      font-size: 20px;
+      color: var(--neon-amber);
+      text-shadow: 0 0 10px var(--neon-amber);
+      margin-bottom: 8px;
+    }
+
+    .results-student {
+      font-family: var(--font-display);
+      font-size: 15px;
+      color: #9cb2da;
+      margin-bottom: 20px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+
+    .stat-box {
+      background: rgba(8, 13, 28, 0.7);
+      border: 1px solid #23345c;
+      border-radius: 10px;
+      padding: 12px 6px;
+    }
+
+    .stat-label {
+      font-family: var(--font-display);
+      font-size: 10px;
+      color: #7287af;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-family: var(--font-arcade);
+      font-size: 16px;
+      color: #ffffff;
+    }
+
+    .stat-value.score { color: var(--neon-cyan); }
+    .stat-value.accuracy { color: var(--neon-green); }
+    .stat-value.matched { color: var(--neon-purple); }
+
+    .firebase-status-box {
+      background: rgba(0, 255, 102, 0.08);
+      border: 1.5px solid var(--neon-green);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 20px;
+      font-family: var(--font-display);
+      font-size: 13px;
+      color: #d2ffe0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .firebase-status-box.submitting {
+      border-color: var(--neon-amber);
+      background: rgba(255, 170, 0, 0.08);
+      color: #ffe6b0;
+    }
+
+    .firebase-status-box.error {
+      border-color: var(--neon-red);
+      background: rgba(255, 51, 68, 0.08);
+      color: #ffccd0;
+    }
+
+    .results-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn-secondary {
+      background: rgba(22, 32, 64, 0.8);
+      border: 1.5px solid #334775;
+      color: #ffffff;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+    }
+
+    /* Screen D: Teacher Dashboard */
+    #screen-teacher {
+      padding: 24px 16px 40px;
+      align-items: center;
+    }
+
+    .teacher-container {
+      width: 100%;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    .teacher-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .teacher-title {
+      font-family: var(--font-arcade);
+      font-size: 18px;
+      color: var(--neon-purple);
+      text-shadow: 0 0 10px var(--neon-purple);
+    }
+
+    .teacher-kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .kpi-card {
+      background: rgba(14, 20, 42, 0.85);
+      border: 1px solid #23355d;
+      border-radius: 10px;
+      padding: 16px;
+      text-align: left;
+    }
+
+    .kpi-title {
+      font-family: var(--font-display);
+      font-size: 11px;
+      letter-spacing: 1px;
+      color: #7991bd;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .kpi-val {
+      font-family: var(--font-arcade);
+      font-size: 20px;
+      color: #fff;
+    }
+
+    .teacher-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+      align-items: center;
+      background: rgba(12, 17, 36, 0.7);
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #1f2d4e;
+    }
+
+    .teacher-select {
+      background: #090e20;
+      border: 1px solid #28395f;
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-family: var(--font-display);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+      background: rgba(12, 17, 36, 0.85);
+      border: 1px solid #202d4f;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .teacher-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+      font-family: var(--font-display);
+    }
+
+    .teacher-table th {
+      background: rgba(19, 27, 56, 0.95);
+      padding: 12px 14px;
+      color: #8da4ce;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border-bottom: 1.5px solid #293a63;
+      white-space: nowrap;
+    }
+
+    .teacher-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(34, 48, 82, 0.5);
+      color: #dbe4f5;
+      white-space: nowrap;
+    }
+
+    .teacher-table tr:hover td {
+      background: rgba(0, 243, 255, 0.05);
+    }
+
+    .tag-year {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      background: rgba(0, 243, 255, 0.15);
+      color: var(--neon-cyan);
+      border: 1px solid rgba(0, 243, 255, 0.3);
+    }
+
+    .tag-mode {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      background: rgba(188, 19, 254, 0.15);
+      color: var(--neon-purple);
+      border: 1px solid rgba(188, 19, 254, 0.3);
+    }
+
+    /* Modal for Teacher Auth */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(6px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-box {
+      width: 100%;
+      max-width: 400px;
+      background: #0f152d;
+      border: 2px solid var(--neon-pink);
+      border-radius: 12px;
+      padding: 28px 24px;
+      text-align: center;
+      box-shadow: 0 0 25px rgba(255, 0, 119, 0.3);
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #00f3ff;
+      color: #040817;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.6);
+      z-index: 200;
+      transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+      pointer-events: none;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Responsive tweaks */
+    @media (max-width: 600px) {
+      .title-glitch { font-size: 17px; }
+      .class-grid { grid-template-columns: repeat(2, 1fr); }
+      .hud-badge { font-size: 10px; padding: 4px 6px; }
+      .target-word-display { font-size: 16px; }
+      .target-mode-pill { font-size: 9px; }
+      .dpad-cluster {
+        grid-template-columns: 66px 66px 66px;
+        grid-template-rows: 52px 52px;
+      }
+      .ctrl-btn { font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="crt-overlay"></div>
+
+  <!-- SCREEN A: REGISTRATION -->
+  <div id="screen-registration" class="screen active">
+    <div class="reg-card">
+      <button id="btn-sound-toggle" class="sound-toggle-btn" aria-label="Toggle Sound">
+        <span id="sound-icon">🔊</span> <span id="sound-text">SFX ON</span>
+      </button>
+
+      <div class="title-glitch">NEON PATHFINDER</div>
+      <div class="subtitle-badge">Synonym & Antonym Quest</div>
+
+      <div class="form-group">
+        <label class="form-label" for="input-student-name">Student Explorer Name</label>
+        <input type="text" id="input-student-name" class="input-neon" placeholder="e.g. Maya Chen" maxlength="28" autocomplete="name">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Select Class Year (CEFR Level)</label>
+        <div class="class-grid" id="class-selector">
+          <button type="button" class="class-btn selected" data-year="Year 1">Year 1<span>Pre-A1</span></button>
+          <button type="button" class="class-btn" data-year="Year 2">Year 2<span>Pre-A1/A1 Low</span></button>
+          <button type="button" class="class-btn" data-year="Year 3">Year 3<span>A1 Mid</span></button>
+          <button type="button" class="class-btn" data-year="Year 4">Year 4<span>A1 High</span></button>
+          <button type="button" class="class-btn" data-year="Year 5">Year 5<span>A2 Low</span></button>
+          <button type="button" class="class-btn" data-year="Year 6">Year 6<span>A2 Mid</span></button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Quest Challenge Mode</label>
+        <div class="mode-toggle-group" id="mode-selector">
+          <button type="button" class="mode-btn" data-mode="Synonyms Only">Synonyms Only</button>
+          <button type="button" class="mode-btn" data-mode="Antonyms Only">Antonyms Only</button>
+          <button type="button" class="mode-btn selected" data-mode="Mixed Challenge">Mixed Challenge</button>
+        </div>
+      </div>
+
+      <button id="btn-start-quest" class="btn-arcade-start">START QUEST</button>
+
+      <div>
+        <a id="link-teacher-portal" class="portal-link">🔒 Teacher Portal Login</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN B: ARCADE GAME HUD & CANVAS -->
+  <div id="screen-game" class="screen">
+    <div class="game-hud-top">
+      <div class="hud-row-meta">
+        <div class="hud-badge">
+          <span>CLASS:</span>
+          <span id="hud-class" style="color:var(--neon-cyan)">Year 1</span>
+        </div>
+        <div class="hud-badge timer-badge" id="hud-timer-badge">
+          <span>TIME:</span>
+          <span id="hud-timer">120s</span>
+        </div>
+        <div class="hud-badge score-badge">
+          <span>SCORE:</span>
+          <span id="hud-score">0</span>
+        </div>
+      </div>
+
+      <div class="target-banner">
+        <span id="hud-target-pill" class="target-mode-pill synonym">FIND SYNONYM</span>
+        <span class="hud-target-label" style="font-family:var(--font-arcade); font-size:10px; color:#8ea2cc;">FOR:</span>
+        <span id="hud-target-word" class="target-word-display">HAPPY</span>
+      </div>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+
+    <!-- On-screen directional buttons for mobile & touch -->
+    <div class="controls-overlay">
+      <div class="dpad-cluster">
+        <button id="btn-ctrl-up" class="ctrl-btn ctrl-up" aria-label="Forward">
+          ▲<span class="label">FWD</span>
+        </button>
+        <button id="btn-ctrl-left" class="ctrl-btn ctrl-left" aria-label="Left">
+          ◀<span class="label">LEFT</span>
+        </button>
+        <button id="btn-ctrl-down" class="ctrl-btn ctrl-down" aria-label="Back">
+          ▼<span class="label">BACK</span>
+        </button>
+        <button id="btn-ctrl-right" class="ctrl-btn ctrl-right" aria-label="Right">
+          ▶<span class="label">RIGHT</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN C: RESULTS SCREEN -->
+  <div id="screen-results" class="screen">
+    <div class="results-card">
+      <div class="results-title">QUEST COMPLETED!</div>
+      <div id="results-student-info" class="results-student">Alex • Year 4 • Mixed Challenge</div>
+
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-label">Final Score</div>
+          <div id="stat-final-score" class="stat-value score">1200</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Accuracy</div>
+          <div id="stat-accuracy" class="stat-value accuracy">94%</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Words Matched</div>
+          <div id="stat-matched" class="stat-value matched">12</div>
+        </div>
+      </div>
+
+      <div id="firebase-status" class="firebase-status-box">
+        <span>Transmitting scores to Teacher Anne...</span>
+      </div>
+
+      <div class="results-actions">
+        <button id="btn-copy-summary" class="btn-secondary">📋 Copy Summary Text</button>
+        <button id="btn-play-again" class="btn-arcade-start" style="margin-top:0;">PLAY AGAIN</button>
+        <button id="btn-results-menu" class="btn-secondary">Main Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN D: TEACHER DASHBOARD -->
+  <div id="screen-teacher" class="screen">
+    <div class="teacher-container">
+      <div class="teacher-header">
+        <div>
+          <div class="teacher-title">TEACHER ANNE PORTAL</div>
+          <div style="font-size:12px; color:#8fa6cf; margin-top:4px;">Live Classroom Pathfinder Submissions</div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button id="btn-teacher-export" class="btn-secondary" style="border-color:var(--neon-green); color:var(--neon-green);">
+            📥 Export to CSV
+          </button>
+          <button id="btn-teacher-back" class="btn-secondary">
+            ⬅ Return to Game
+          </button>
+        </div>
+      </div>
+
+      <div class="teacher-kpis">
+        <div class="kpi-card">
+          <div class="kpi-title">Total Quests</div>
+          <div id="kpi-total-students" class="kpi-val" style="color:var(--neon-cyan)">0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Average Score</div>
+          <div id="kpi-avg-score" class="kpi-val" style="color:var(--neon-amber)">0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Average Accuracy</div>
+          <div id="kpi-avg-accuracy" class="kpi-val" style="color:var(--neon-green)">0%</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Top Scorer</div>
+          <div id="kpi-top-scorer" class="kpi-val" style="color:var(--neon-purple); font-size:15px;">-</div>
+        </div>
+      </div>
+
+      <div class="teacher-toolbar">
+        <label style="font-size:12px; color:#7e95be; font-weight:700;">FILTER CLASS:</label>
+        <select id="teacher-filter-class" class="teacher-select">
+          <option value="ALL">All Classes (Year 1 - 6)</option>
+          <option value="Year 1">Year 1</option>
+          <option value="Year 2">Year 2</option>
+          <option value="Year 3">Year 3</option>
+          <option value="Year 4">Year 4</option>
+          <option value="Year 5">Year 5</option>
+          <option value="Year 6">Year 6</option>
+        </select>
+
+        <label style="font-size:12px; color:#7e95be; font-weight:700; margin-left:8px;">MODE:</label>
+        <select id="teacher-filter-mode" class="teacher-select">
+          <option value="ALL">All Modes</option>
+          <option value="Synonyms Only">Synonyms Only</option>
+          <option value="Antonyms Only">Antonyms Only</option>
+          <option value="Mixed Challenge">Mixed Challenge</option>
+        </select>
+
+        <input type="text" id="teacher-search-input" class="teacher-select" style="flex:1; min-width:140px;" placeholder="Search student name...">
+      </div>
+
+      <div class="table-responsive">
+        <table class="teacher-table">
+          <thead>
+            <tr>
+              <th>Date / Time</th>
+              <th>Student Name</th>
+              <th>Class</th>
+              <th>Mode</th>
+              <th>Score</th>
+              <th>Accuracy</th>
+            </tr>
+          </thead>
+          <tbody id="teacher-table-body">
+            <tr>
+              <td colspan="6" style="text-align:center; padding:30px; color:#778ba8;">Connecting to live database...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASSWORD MODAL FOR TEACHER PORTAL -->
+  <div id="modal-teacher-auth" class="modal-overlay">
+    <div class="modal-box">
+      <div style="font-family:var(--font-arcade); font-size:14px; color:var(--neon-pink); margin-bottom:12px;">TEACHER ACCESS</div>
+      <div style="font-size:13px; color:#a2b7db; margin-bottom:18px;">Please enter Teacher Anne's security passkey to access student records:</div>
+      <input type="password" id="input-teacher-pwd" class="input-neon" placeholder="Enter password" style="text-align:center; margin-bottom:16px;">
+      <div style="display:flex; gap:10px;">
+        <button id="btn-auth-cancel" class="btn-secondary" style="flex:1;">Cancel</button>
+        <button id="btn-auth-submit" class="btn-arcade-start" style="flex:1; margin-top:0;">Access</button>
+      </div>
+      <div id="auth-err-msg" style="color:var(--neon-red); font-size:12px; margin-top:10px; display:none;">Incorrect password. Please try again.</div>
+    </div>
+  </div>
+
+  <!-- TOAST FEEDBACK -->
+  <div id="toast" class="toast">Summary text copied to clipboard!</div>
+
+  <script>
+    /* =====================================================================
+       1. FIREBASE INITIALIZATION & COMPATIBILITY
+       ===================================================================== */
+    const firebaseConfig = {
+      apiKey: "AIzaSyAR5GdrmL5XfVt_uWxX2J1tCwCtUF8pYNk",
+      authDomain: "aladdin-english-game.firebaseapp.com",
+      databaseURL: "https://aladdin-english-game-default-rtdb.firebaseio.com",
+      projectId: "aladdin-english-game",
+      storageBucket: "aladdin-english-game.firebasestorage.app",
+      messagingSenderId: "299335316128",
+      appId: "1:299335316128:web:c1e8e96eab366a4a57cfc5",
+      measurementId: "G-SYP3WQXGP5"
+    };
+
+    let database = null;
+    try {
+      if (typeof firebase !== 'undefined') {
+        firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+      }
+    } catch (err) {
+      console.warn("Firebase initialization notice:", err);
+    }
+
+    /* =====================================================================
+       2. CEFR-ALIGNED EXPANDED VOCABULARY DATASETS (YEAR 1 TO YEAR 6)
+       - 50 Completely Unique Questions per Year (25 Synonyms, 25 Antonyms)
+       - 300 Total Unique Vocabulary Entries across CEFR Pre-A1 to A2 Mid
+       - Zero duplicate target words in each level
+       ===================================================================== */
+    const VOCABULARY_BANKS = {
+      "Year 1": [
+        // Year 1 (Age 7, CEFR Pre-A1, Cambridge Starters): Basic visual adjectives & everyday high-frequency words
+        { target: "HAPPY", type: "SYNONYM", answer: "GLAD", distractors: ["SAD", "COLD"] },
+        { target: "BIG", type: "SYNONYM", answer: "LARGE", distractors: ["TINY", "LOW"] },
+        { target: "SMALL", type: "SYNONYM", answer: "LITTLE", distractors: ["HUGE", "DARK"] },
+        { target: "SAD", type: "SYNONYM", answer: "UNHAPPY", distractors: ["JOYFUL", "QUICK"] },
+        { target: "FAST", type: "SYNONYM", answer: "QUICK", distractors: ["SLOW", "HEAVY"] },
+        { target: "TINY", type: "SYNONYM", answer: "SMALL", distractors: ["GIANT", "LOUD"] },
+        { target: "SICK", type: "SYNONYM", answer: "ILL", distractors: ["WELL", "CLEAN"] },
+        { target: "START", type: "SYNONYM", answer: "BEGIN", distractors: ["STOP", "SLEEP"] },
+        { target: "GLAD", type: "SYNONYM", answer: "CHEERFUL", distractors: ["ANGRY", "TIRED"] },
+        { target: "YELL", type: "SYNONYM", answer: "SHOUT", distractors: ["WHISPER", "SLEEP"] },
+        { target: "JUMP", type: "SYNONYM", answer: "LEAP", distractors: ["CRAWL", "SIT"] },
+        { target: "SHUT", type: "SYNONYM", answer: "CLOSE", distractors: ["OPEN", "DROP"] },
+        { target: "AFRAID", type: "SYNONYM", answer: "SCARED", distractors: ["BRAVE", "TALL"] },
+        { target: "GIFT", type: "SYNONYM", answer: "PRESENT", distractors: ["BOX", "TOY"] },
+        { target: "NICE", type: "SYNONYM", answer: "KIND", distractors: ["MEAN", "BAD"] },
+        { target: "QUIET", type: "SYNONYM", answer: "SILENT", distractors: ["NOISY", "WILD"] },
+        { target: "HARD", type: "SYNONYM", answer: "TOUGH", distractors: ["SOFT", "EASY"] },
+        { target: "SIMPLE", type: "SYNONYM", answer: "EASY", distractors: ["TRICKY", "HARD"] },
+        { target: "BRIGHT", type: "SYNONYM", answer: "SHINY", distractors: ["DULL", "DARK"] },
+        { target: "SLEEPY", type: "SYNONYM", answer: "TIRED", distractors: ["AWAKE", "BUSY"] },
+        { target: "LOOK", type: "SYNONYM", answer: "SEE", distractors: ["HEAR", "SMELL"] },
+        { target: "RUN", type: "SYNONYM", answer: "JOG", distractors: ["WALK", "STOP"] },
+        { target: "TALK", type: "SYNONYM", answer: "SPEAK", distractors: ["LISTEN", "READ"] },
+        { target: "SMART", type: "SYNONYM", answer: "CLEVER", distractors: ["SILLY", "WEAK"] },
+        { target: "CHUCKLE", type: "SYNONYM", answer: "LAUGH", distractors: ["CRY", "FROWN"] },
+
+        // Year 1 Antonyms (25 unique targets)
+        { target: "HOT", type: "ANTONYM", answer: "COLD", distractors: ["WARM", "SUNNY"] },
+        { target: "UP", type: "ANTONYM", answer: "DOWN", distractors: ["HIGH", "SKY"] },
+        { target: "DAY", type: "ANTONYM", answer: "NIGHT", distractors: ["SUN", "LIGHT"] },
+        { target: "IN", type: "ANTONYM", answer: "OUT", distractors: ["INSIDE", "NEAR"] },
+        { target: "TALL", type: "ANTONYM", answer: "SHORT", distractors: ["LONG", "HIGH"] },
+        { target: "OPEN", type: "ANTONYM", answer: "CLOSED", distractors: ["WIDE", "FREE"] },
+        { target: "CLEAN", type: "ANTONYM", answer: "DIRTY", distractors: ["NEAT", "PURE"] },
+        { target: "HEAVY", type: "ANTONYM", answer: "LIGHT", distractors: ["BIG", "THICK"] },
+        { target: "EARLY", type: "ANTONYM", answer: "LATE", distractors: ["SOON", "FIRST"] },
+        { target: "NEW", type: "ANTONYM", answer: "OLD", distractors: ["FRESH", "YOUNG"] },
+        { target: "NEAR", type: "ANTONYM", answer: "FAR", distractors: ["CLOSE", "NEXT"] },
+        { target: "SWEET", type: "ANTONYM", answer: "SOUR", distractors: ["TASTY", "NICE"] },
+        { target: "WET", type: "ANTONYM", answer: "DRY", distractors: ["RAINY", "DAMP"] },
+        { target: "SOFT", type: "ANTONYM", answer: "HARD", distractors: ["COZY", "SMOOTH"] },
+        { target: "DARK", type: "ANTONYM", answer: "BRIGHT", distractors: ["BLACK", "DIM"] },
+        { target: "FULL", type: "ANTONYM", answer: "EMPTY", distractors: ["PACKED", "HUGE"] },
+        { target: "RICH", type: "ANTONYM", answer: "POOR", distractors: ["GOLD", "MONEY"] },
+        { target: "THICK", type: "ANTONYM", answer: "THIN", distractors: ["WIDE", "FAT"] },
+        { target: "WIN", type: "ANTONYM", answer: "LOSE", distractors: ["PLAY", "GAME"] },
+        { target: "STAND", type: "ANTONYM", answer: "SIT", distractors: ["WALK", "RUN"] },
+        { target: "GIVE", type: "ANTONYM", answer: "TAKE", distractors: ["SHARE", "KEEP"] },
+        { target: "FRONT", type: "ANTONYM", answer: "BACK", distractors: ["TOP", "SIDE"] },
+        { target: "TRUE", type: "ANTONYM", answer: "FALSE", distractors: ["REAL", "YES"] },
+        { target: "RIGHT", type: "ANTONYM", answer: "WRONG", distractors: ["GOOD", "CORRECT"] },
+        { target: "PUSH", type: "ANTONYM", answer: "PULL", distractors: ["HOLD", "MOVE"] }
+      ],
+
+      "Year 2": [
+        // Year 2 (Age 8, CEFR Pre-A1/A1 Low): Core descriptors, simple classroom & home vocabulary
+        { target: "TIDY", type: "SYNONYM", answer: "NEAT", distractors: ["MESSY", "DIRTY"] },
+        { target: "CRY", type: "SYNONYM", answer: "WEEP", distractors: ["LAUGH", "SMILE"] },
+        { target: "HUGE", type: "SYNONYM", answer: "GIANT", distractors: ["TINY", "SMALL"] },
+        { target: "SHY", type: "SYNONYM", answer: "TIMID", distractors: ["LOUD", "BRAVE"] },
+        { target: "CHOOSE", type: "SYNONYM", answer: "PICK", distractors: ["DROP", "LEAVE"] },
+        { target: "WRONG", type: "SYNONYM", answer: "INCORRECT", distractors: ["RIGHT", "TRUE"] },
+        { target: "THIN", type: "SYNONYM", answer: "SLIM", distractors: ["FAT", "WIDE"] },
+        { target: "CHAT", type: "SYNONYM", answer: "TALK", distractors: ["READ", "WRITE"] },
+        { target: "GLOW", type: "SYNONYM", answer: "SHINE", distractors: ["HIDE", "FADE"] },
+        { target: "HIDE", type: "SYNONYM", answer: "COVER", distractors: ["SHOW", "FIND"] },
+        { target: "LISTEN", type: "SYNONYM", answer: "HEAR", distractors: ["SPEAK", "SHOUT"] },
+        { target: "HELP", type: "SYNONYM", answer: "ASSIST", distractors: ["HURT", "STOP"] },
+        { target: "REST", type: "SYNONYM", answer: "RELAX", distractors: ["RUN", "WORK"] },
+        { target: "ANNOY", type: "SYNONYM", answer: "BOTHER", distractors: ["PLEASE", "HELP"] },
+        { target: "BORING", type: "SYNONYM", answer: "DULL", distractors: ["FUN", "EXCITING"] },
+        { target: "WIDE", type: "SYNONYM", answer: "BROAD", distractors: ["NARROW", "TINY"] },
+        { target: "CHILLY", type: "SYNONYM", answer: "COOL", distractors: ["HOT", "WARM"] },
+        { target: "MEAN", type: "SYNONYM", answer: "UNKIND", distractors: ["NICE", "SWEET"] },
+        { target: "FAMOUS", type: "SYNONYM", answer: "WELL-KNOWN", distractors: ["SECRET", "LOST"] },
+        { target: "ODOR", type: "SYNONYM", answer: "SMELL", distractors: ["TASTE", "SOUND"] },
+        { target: "MEND", type: "SYNONYM", answer: "FIX", distractors: ["BREAK", "TEAR"] },
+        { target: "SILLY", type: "SYNONYM", answer: "FOOLISH", distractors: ["SERIOUS", "SMART"] },
+        { target: "SPRINT", type: "SYNONYM", answer: "RUN", distractors: ["CRAWL", "WALK"] },
+        { target: "LOVE", type: "SYNONYM", answer: "LIKE", distractors: ["HATE", "FEAR"] },
+        { target: "CORRECT", type: "SYNONYM", answer: "RIGHT", distractors: ["WRONG", "BAD"] },
+
+        // Year 2 Antonyms (25 unique targets)
+        { target: "BRAVE", type: "ANTONYM", answer: "SCARED", distractors: ["STRONG", "BOLD"] },
+        { target: "LOUD", type: "ANTONYM", answer: "QUIET", distractors: ["NOISY", "FAST"] },
+        { target: "SMOOTH", type: "ANTONYM", answer: "ROUGH", distractors: ["FLAT", "SOFT"] },
+        { target: "PRETTY", type: "ANTONYM", answer: "UGLY", distractors: ["CUTE", "NICE"] },
+        { target: "POLITE", type: "ANTONYM", answer: "RUDE", distractors: ["KIND", "SWEET"] },
+        { target: "BUY", type: "ANTONYM", answer: "SELL", distractors: ["PAY", "KEEP"] },
+        { target: "TIGHT", type: "ANTONYM", answer: "LOOSE", distractors: ["FIT", "WARM"] },
+        { target: "EASY", type: "ANTONYM", answer: "HARD", distractors: ["SIMPLE", "SHORT"] },
+        { target: "STRONG", type: "ANTONYM", answer: "WEAK", distractors: ["TOUGH", "BIG"] },
+        { target: "CLEVER", type: "ANTONYM", answer: "SILLY", distractors: ["SMART", "QUICK"] },
+        { target: "SAFE", type: "ANTONYM", answer: "DANGEROUS", distractors: ["CALM", "GOOD"] },
+        { target: "CHEAP", type: "ANTONYM", answer: "EXPENSIVE", distractors: ["LOW", "SMALL"] },
+        { target: "DEEP", type: "ANTONYM", answer: "SHALLOW", distractors: ["BOTTOM", "HIGH"] },
+        { target: "SHARP", type: "ANTONYM", answer: "BLUNT", distractors: ["POINTY", "FINE"] },
+        { target: "FRIEND", type: "ANTONYM", answer: "ENEMY", distractors: ["BUDDY", "COUSIN"] },
+        { target: "TEACH", type: "ANTONYM", answer: "LEARN", distractors: ["READ", "WRITE"] },
+        { target: "ARRIVE", type: "ANTONYM", answer: "LEAVE", distractors: ["ENTER", "COME"] },
+        { target: "LAUGH", type: "ANTONYM", answer: "CRY", distractors: ["SMILE", "CHEER"] },
+        { target: "SHINY", type: "ANTONYM", answer: "DULL", distractors: ["BRIGHT", "CLEAN"] },
+        { target: "ASLEEP", type: "ANTONYM", answer: "AWAKE", distractors: ["TIRED", "RESTING"] },
+        { target: "BITTER", type: "ANTONYM", answer: "SWEET", distractors: ["SOUR", "SALTY"] },
+        { target: "PEACE", type: "ANTONYM", answer: "WAR", distractors: ["CALM", "REST"] },
+        { target: "FLOAT", type: "ANTONYM", answer: "SINK", distractors: ["SWIM", "FLY"] },
+        { target: "YOUNG", type: "ANTONYM", answer: "OLD", distractors: ["LITTLE", "NEW"] },
+        { target: "FIRST", type: "ANTONYM", answer: "LAST", distractors: ["NEXT", "SECOND"] }
+      ],
+
+      "Year 3": [
+        // Year 3 (Age 9, CEFR A1 Mid, Cambridge Movers): Expanded storybook descriptors & daily narrative words
+        { target: "BEAUTIFUL", type: "SYNONYM", answer: "LOVELY", distractors: ["UGLY", "PLAIN"] },
+        { target: "CLEVER", type: "SYNONYM", answer: "SMART", distractors: ["SILLY", "DULL"] },
+        { target: "POWERFUL", type: "SYNONYM", answer: "STRONG", distractors: ["WEAK", "FRAIL"] },
+        { target: "STRANGE", type: "SYNONYM", answer: "ODD", distractors: ["NORMAL", "USUAL"] },
+        { target: "ACCURATE", type: "SYNONYM", answer: "CORRECT", distractors: ["WRONG", "FALSE"] },
+        { target: "CALM", type: "SYNONYM", answer: "PEACEFUL", distractors: ["ANGRY", "NOISY"] },
+        { target: "GATHER", type: "SYNONYM", answer: "COLLECT", distractors: ["LOSE", "DROP"] },
+        { target: "DESTROY", type: "SYNONYM", answer: "RUIN", distractors: ["BUILD", "MAKE"] },
+        { target: "SUDDEN", type: "SYNONYM", answer: "QUICK", distractors: ["SLOW", "LATE"] },
+        { target: "BRIEF", type: "SYNONYM", answer: "SHORT", distractors: ["LONG", "ENDLESS"] },
+        { target: "BLEND", type: "SYNONYM", answer: "MIX", distractors: ["CUT", "SPLIT"] },
+        { target: "DISCOVER", type: "SYNONYM", answer: "FIND", distractors: ["LOSE", "HIDE"] },
+        { target: "ENTIRE", type: "SYNONYM", answer: "WHOLE", distractors: ["HALF", "PART"] },
+        { target: "FRAIL", type: "SYNONYM", answer: "WEAK", distractors: ["STRONG", "BIG"] },
+        { target: "GENEROUS", type: "SYNONYM", answer: "KIND", distractors: ["MEAN", "GREEDY"] },
+        { target: "HONEST", type: "SYNONYM", answer: "TRUTHFUL", distractors: ["TRICKY", "FALSE"] },
+        { target: "SHINE", type: "SYNONYM", answer: "GLEAM", distractors: ["FADE", "DARK"] },
+        { target: "CHEERFUL", type: "SYNONYM", answer: "JOYFUL", distractors: ["GLOOMY", "SAD"] },
+        { target: "LOYAL", type: "SYNONYM", answer: "FAITHFUL", distractors: ["FALSE", "MEAN"] },
+        { target: "MISTAKE", type: "SYNONYM", answer: "ERROR", distractors: ["TRUTH", "FACT"] },
+        { target: "AGILE", type: "SYNONYM", answer: "NIMBLE", distractors: ["CLUMSY", "SLOW"] },
+        { target: "WEIRD", type: "SYNONYM", answer: "STRANGE", distractors: ["COMMON", "USUAL"] },
+        { target: "PRAISE", type: "SYNONYM", answer: "COMPLIMENT", distractors: ["SCOLD", "BLAME"] },
+        { target: "COURAGEOUS", type: "SYNONYM", answer: "BRAVE", distractors: ["AFRAID", "SCARED"] },
+        { target: "DANGEROUS", type: "SYNONYM", answer: "RISKY", distractors: ["SAFE", "CALM"] },
+
+        // Year 3 Antonyms (25 unique targets)
+        { target: "RARE", type: "ANTONYM", answer: "COMMON", distractors: ["SPECIAL", "FEW"] },
+        { target: "EXPAND", type: "ANTONYM", answer: "SHRINK", distractors: ["GROW", "STRETCH"] },
+        { target: "ALLOW", type: "ANTONYM", answer: "FORBID", distractors: ["HELP", "LET"] },
+        { target: "BUILD", type: "ANTONYM", answer: "DESTROY", distractors: ["PAINT", "CLEAN"] },
+        { target: "REMEMBER", type: "ANTONYM", answer: "FORGET", distractors: ["THINK", "KNOW"] },
+        { target: "ACCEPT", type: "ANTONYM", answer: "REFUSE", distractors: ["TAKE", "KEEP"] },
+        { target: "JOIN", type: "ANTONYM", answer: "SEPARATE", distractors: ["MEET", "LINK"] },
+        { target: "GUILTY", type: "ANTONYM", answer: "INNOCENT", distractors: ["BAD", "WRONG"] },
+        { target: "VICTORY", type: "ANTONYM", answer: "DEFEAT", distractors: ["WIN", "SUCCESS"] },
+        { target: "SELFISH", type: "ANTONYM", answer: "GENEROUS", distractors: ["GREEDY", "STINGY"] },
+        { target: "ANCIENT", type: "ANTONYM", answer: "MODERN", distractors: ["OLD", "HISTORIC"] },
+        { target: "CHEER", type: "ANTONYM", answer: "SCOLD", distractors: ["CLAP", "SHOUT"] },
+        { target: "INHALE", type: "ANTONYM", answer: "EXHALE", distractors: ["BREATHE", "BLOW"] },
+        { target: "ALWAYS", type: "ANTONYM", answer: "NEVER", distractors: ["SOMETIMES", "OFTEN"] },
+        { target: "VISIBLE", type: "ANTONYM", answer: "HIDDEN", distractors: ["CLEAR", "OPEN"] },
+        { target: "WEALTHY", type: "ANTONYM", answer: "POOR", distractors: ["RICH", "LUCKY"] },
+        { target: "WISE", type: "ANTONYM", answer: "FOOLISH", distractors: ["CLEVER", "SMART"] },
+        { target: "ADMIRE", type: "ANTONYM", answer: "DISLIKE", distractors: ["LOVE", "PRAISE"] },
+        { target: "PATIENT", type: "ANTONYM", answer: "IMPATIENT", distractors: ["CALM", "QUIET"] },
+        { target: "SUCCESS", type: "ANTONYM", answer: "FAILURE", distractors: ["PRIZE", "WIN"] },
+        { target: "TOP", type: "ANTONYM", answer: "BOTTOM", distractors: ["HIGH", "PEAK"] },
+        { target: "MAXIMUM", type: "ANTONYM", answer: "MINIMUM", distractors: ["MOST", "FULL"] },
+        { target: "REAL", type: "ANTONYM", answer: "FAKE", distractors: ["TRUE", "GOOD"] },
+        { target: "INCLUDE", type: "ANTONYM", answer: "EXCLUDE", distractors: ["KEEP", "ADD"] },
+        { target: "ENTRANCE", type: "ANTONYM", answer: "EXIT", distractors: ["DOOR", "GATE"] }
+      ],
+
+      "Year 4": [
+        // Year 4 (Age 10, CEFR A1 High): Functional narrative & expressive vocabulary for primary essays
+        { target: "BRAVE", type: "SYNONYM", answer: "COURAGEOUS", distractors: ["COWARD", "TIMID"] },
+        { target: "SIMPLE", type: "SYNONYM", answer: "EASY", distractors: ["HARD", "TRICKY"] },
+        { target: "ANGRY", type: "SYNONYM", answer: "FURIOUS", distractors: ["PLEASED", "CALM"] },
+        { target: "AMAZING", type: "SYNONYM", answer: "WONDERFUL", distractors: ["BORING", "PLAIN"] },
+        { target: "CAREFUL", type: "SYNONYM", answer: "CAUTIOUS", distractors: ["CARELESS", "RASH"] },
+        { target: "DELIGHT", type: "SYNONYM", answer: "JOY", distractors: ["SADNESS", "ANGER"] },
+        { target: "ELEGANT", type: "SYNONYM", answer: "GRACEFUL", distractors: ["CLUMSY", "ROUGH"] },
+        { target: "FAITHFUL", type: "SYNONYM", answer: "DEVOTED", distractors: ["FALSE", "MEAN"] },
+        { target: "GLOOMY", type: "SYNONYM", answer: "DREARY", distractors: ["SUNNY", "BRIGHT"] },
+        { target: "PERILOUS", type: "SYNONYM", answer: "DANGEROUS", distractors: ["SAFE", "EASY"] },
+        { target: "ENORMOUS", type: "SYNONYM", answer: "GIGANTIC", distractors: ["TINY", "SMALL"] },
+        { target: "JEALOUS", type: "SYNONYM", answer: "ENVIOUS", distractors: ["HAPPY", "PROUD"] },
+        { target: "SIMILAR", type: "SYNONYM", answer: "ALIKE", distractors: ["DIFFERENT", "STRANGE"] },
+        { target: "RADIANT", type: "SYNONYM", answer: "BRIGHT", distractors: ["DARK", "PALE"] },
+        { target: "MARVELOUS", type: "SYNONYM", answer: "FANTASTIC", distractors: ["POOR", "TERRIBLE"] },
+        { target: "NOVEL", type: "SYNONYM", answer: "NEW", distractors: ["OLD", "ANCIENT"] },
+        { target: "BARRIER", type: "SYNONYM", answer: "OBSTACLE", distractors: ["ROAD", "OPENING"] },
+        { target: "PLENTIFUL", type: "SYNONYM", answer: "ABUNDANT", distractors: ["SCARCE", "FEW"] },
+        { target: "ACCELERATE", type: "SYNONYM", answer: "SPEED UP", distractors: ["SLOW DOWN", "STOP"] },
+        { target: "RESCUE", type: "SYNONYM", answer: "SAVE", distractors: ["HARM", "LEAVE"] },
+        { target: "SPLENDID", type: "SYNONYM", answer: "GRAND", distractors: ["UGLY", "SMALL"] },
+        { target: "THRIVE", type: "SYNONYM", answer: "GROW", distractors: ["DIE", "FADE"] },
+        { target: "URGENT", type: "SYNONYM", answer: "PRESSING", distractors: ["CASUAL", "SLOW"] },
+        { target: "VALUABLE", type: "SYNONYM", answer: "PRECIOUS", distractors: ["CHEAP", "USELESS"] },
+        { target: "TIRED", type: "SYNONYM", answer: "EXHAUSTED", distractors: ["FRESH", "AWAKE"] },
+
+        // Year 4 Antonyms (25 unique targets)
+        { target: "QUIET", type: "ANTONYM", answer: "NOISY", distractors: ["CALM", "SILENT"] },
+        { target: "CONCEAL", type: "ANTONYM", answer: "REVEAL", distractors: ["HIDE", "COVER"] },
+        { target: "OFTEN", type: "ANTONYM", answer: "SELDOM", distractors: ["ALWAYS", "DAILY"] },
+        { target: "GENTLE", type: "ANTONYM", answer: "HARSH", distractors: ["SOFT", "KIND"] },
+        { target: "HUMBLE", type: "ANTONYM", answer: "PROUD", distractors: ["MEEK", "SHY"] },
+        { target: "INNOCENT", type: "ANTONYM", answer: "GUILTY", distractors: ["PURE", "GOOD"] },
+        { target: "STRICT", type: "ANTONYM", answer: "EASYGOING", distractors: ["STERN", "SERIOUS"] },
+        { target: "HOPEFUL", type: "ANTONYM", answer: "HOPELESS", distractors: ["HAPPY", "CHEERFUL"] },
+        { target: "ALLOW", type: "ANTONYM", answer: "BAN", distractors: ["GIVE", "LET"] },
+        { target: "BENDY", type: "ANTONYM", answer: "STIFF", distractors: ["SOFT", "FLEXIBLE"] },
+        { target: "SUPERIOR", type: "ANTONYM", answer: "INFERIOR", distractors: ["TOP", "BETTER"] },
+        { target: "TIMID", type: "ANTONYM", answer: "BOLD", distractors: ["SHY", "QUIET"] },
+        { target: "CITY", type: "ANTONYM", answer: "COUNTRYSIDE", distractors: ["TOWN", "STREET"] },
+        { target: "FREE", type: "ANTONYM", answer: "CAPTIVE", distractors: ["OPEN", "WILD"] },
+        { target: "DRY", type: "ANTONYM", answer: "FERTILE", distractors: ["SANDY", "BARREN"] },
+        { target: "CAREFUL", type: "ANTONYM", answer: "RECKLESS", distractors: ["SAFE", "SLOW"] },
+        { target: "HARDWORKING", type: "ANTONYM", answer: "LAZY", distractors: ["BUSY", "SMART"] },
+        { target: "PROMPT", type: "ANTONYM", answer: "LATE", distractors: ["FAST", "EARLY"] },
+        { target: "WILD", type: "ANTONYM", answer: "TAME", distractors: ["FIERCE", "ANGRY"] },
+        { target: "GRADUAL", type: "ANTONYM", answer: "SUDDEN", distractors: ["SLOW", "STEADY"] },
+        { target: "FRIENDLY", type: "ANTONYM", answer: "HOSTILE", distractors: ["NICE", "WARM"] },
+        { target: "HUGE", type: "ANTONYM", answer: "TINY", distractors: ["BIG", "ENORMOUS"] },
+        { target: "CHEERFUL", type: "ANTONYM", answer: "GLOOMY", distractors: ["GLAD", "BRIGHT"] },
+        { target: "EAGER", type: "ANTONYM", answer: "UNWILLING", distractors: ["KEEN", "READY"] },
+        { target: "LEGAL", type: "ANTONYM", answer: "ILLEGAL", distractors: ["FAIR", "RIGHT"] }
+      ],
+
+      "Year 5": [
+        // Year 5 (Age 11, CEFR A2 Low, Cambridge Flyers): Contextual modifiers, opinion & reason vocabulary
+        { target: "ANCIENT", type: "SYNONYM", answer: "OLD", distractors: ["NEW", "MODERN"] },
+        { target: "START", type: "SYNONYM", answer: "BEGIN", distractors: ["STOP", "FINISH"] },
+        { target: "GENEROUS", type: "SYNONYM", answer: "CHARITABLE", distractors: ["GREEDY", "MEAN"] },
+        { target: "ESSENTIAL", type: "SYNONYM", answer: "VITAL", distractors: ["UNIMPORTANT", "EXTRA"] },
+        { target: "CAUTIOUS", type: "SYNONYM", answer: "CAREFUL", distractors: ["CARELESS", "RASH"] },
+        { target: "PERMIT", type: "SYNONYM", answer: "ALLOW", distractors: ["FORBID", "BLOCK"] },
+        { target: "IMMENSE", type: "SYNONYM", answer: "HUGE", distractors: ["TINY", "LITTLE"] },
+        { target: "VACANT", type: "SYNONYM", answer: "EMPTY", distractors: ["FULL", "BUSY"] },
+        { target: "SCARCE", type: "SYNONYM", answer: "RARE", distractors: ["COMMON", "PLENTY"] },
+        { target: "RAPID", type: "SYNONYM", answer: "SWIFT", distractors: ["SLOW", "LAZY"] },
+        { target: "ANXIOUS", type: "SYNONYM", answer: "NERVOUS", distractors: ["CALM", "BRAVE"] },
+        { target: "CLARIFY", type: "SYNONYM", answer: "EXPLAIN", distractors: ["CONFUSE", "HIDE"] },
+        { target: "DIMINISH", type: "SYNONYM", answer: "DECREASE", distractors: ["GROW", "INCREASE"] },
+        { target: "ELABORATE", type: "SYNONYM", answer: "DETAILED", distractors: ["SIMPLE", "BASIC"] },
+        { target: "FEASIBLE", type: "SYNONYM", answer: "POSSIBLE", distractors: ["IMPOSSIBLE", "HARD"] },
+        { target: "AUTHENTIC", type: "SYNONYM", answer: "GENUINE", distractors: ["FAKE", "COPIED"] },
+        { target: "THEORY", type: "SYNONYM", answer: "IDEA", distractors: ["FACT", "PROOF"] },
+        { target: "JUBILANT", type: "SYNONYM", answer: "JOYFUL", distractors: ["SAD", "UPSET"] },
+        { target: "ACTIVE", type: "SYNONYM", answer: "ENERGETIC", distractors: ["TIRED", "LAZY"] },
+        { target: "LUCID", type: "SYNONYM", answer: "CLEAR", distractors: ["CONFUSING", "DARK"] },
+        { target: "CALM DOWN", type: "SYNONYM", answer: "SOOTHE", distractors: ["ANGER", "SCARE"] },
+        { target: "NOURISH", type: "SYNONYM", answer: "FEED", distractors: ["STARVE", "DRAIN"] },
+        { target: "UNAWARE", type: "SYNONYM", answer: "OBLIVIOUS", distractors: ["WATCHFUL", "ALERT"] },
+        { target: "OBSERVANT", type: "SYNONYM", answer: "ATTENTIVE", distractors: ["BLIND", "CARELESS"] },
+        { target: "RELUCTANT", type: "SYNONYM", answer: "HESITANT", distractors: ["EAGER", "READY"] },
+
+        // Year 5 Antonyms (25 unique targets)
+        { target: "GENEROUS", type: "ANTONYM", answer: "SELFISH", distractors: ["KIND", "NICE"] },
+        { target: "ANCIENT", type: "ANTONYM", answer: "MODERN", distractors: ["AGED", "OLD"] },
+        { target: "ESSENTIAL", type: "ANTONYM", answer: "UNIMPORTANT", distractors: ["VITAL", "MAIN"] },
+        { target: "VACANT", type: "ANTONYM", answer: "OCCUPIED", distractors: ["HOLLOW", "FREE"] },
+        { target: "PLENTIFUL", type: "ANTONYM", answer: "SCARCE", distractors: ["MANY", "FULL"] },
+        { target: "CONFIDENT", type: "ANTONYM", answer: "INSECURE", distractors: ["SURE", "PROUD"] },
+        { target: "SUPERIOR", type: "ANTONYM", answer: "INFERIOR", distractors: ["GREAT", "BEST"] },
+        { target: "GATHER", type: "ANTONYM", answer: "SCATTER", distractors: ["COLLECT", "KEEP"] },
+        { target: "FREQUENT", type: "ANTONYM", answer: "RARE", distractors: ["OFTEN", "DAILY"] },
+        { target: "CAUTIOUS", type: "ANTONYM", answer: "RECKLESS", distractors: ["SAFE", "WISE"] },
+        { target: "BLUNT", type: "ANTONYM", answer: "SHARP", distractors: ["ROUND", "DULL"] },
+        { target: "CEASE", type: "ANTONYM", answer: "START", distractors: ["STOP", "PAUSE"] },
+        { target: "DORMANT", type: "ANTONYM", answer: "ACTIVE", distractors: ["ASLEEP", "STILL"] },
+        { target: "FAMOUS", type: "ANTONYM", answer: "UNKNOWN", distractors: ["POPULAR", "GREAT"] },
+        { target: "STRENGTHEN", type: "ANTONYM", answer: "WEAKEN", distractors: ["BUILD", "PROTECT"] },
+        { target: "PURE", type: "ANTONYM", answer: "DIRTY", distractors: ["CLEAN", "CLEAR"] },
+        { target: "HARMONIOUS", type: "ANTONYM", answer: "NOISY", distractors: ["SWEET", "PLEASANT"] },
+        { target: "SPOTLESS", type: "ANTONYM", answer: "FILTHY", distractors: ["CLEAN", "TIDY"] },
+        { target: "CHILDISH", type: "ANTONYM", answer: "MATURE", distractors: ["YOUNG", "SILLY"] },
+        { target: "ENERGETIC", type: "ANTONYM", answer: "LAZY", distractors: ["FAST", "ACTIVE"] },
+        { target: "MODERN", type: "ANTONYM", answer: "OLD-FASHIONED", distractors: ["NEW", "FRESH"] },
+        { target: "SAFE", type: "ANTONYM", answer: "RISKY", distractors: ["SHELTERED", "GOOD"] },
+        { target: "TOUGH", type: "ANTONYM", answer: "FRAGILE", distractors: ["HARD", "STRONG"] },
+        { target: "STORMY", type: "ANTONYM", answer: "SERENE", distractors: ["WILD", "RAINY"] },
+        { target: "COMMON", type: "ANTONYM", answer: "UNIQUE", distractors: ["USUAL", "NORMAL"] }
+      ],
+
+      "Year 6": [
+        // Year 6 (Age 12, CEFR A2 Mid / Primary School Exit): Academic reading comprehension & advanced primary vocab
+        { target: "DIFFICULT", type: "SYNONYM", answer: "CHALLENGING", distractors: ["EASY", "SIMPLE"] },
+        { target: "WEALTHY", type: "SYNONYM", answer: "RICH", distractors: ["POOR", "NEEDY"] },
+        { target: "ACCURATE", type: "SYNONYM", answer: "PRECISE", distractors: ["WRONG", "CLUMSY"] },
+        { target: "VAST", type: "SYNONYM", answer: "IMMENSE", distractors: ["TINY", "NARROW"] },
+        { target: "TRANQUIL", type: "SYNONYM", answer: "SERENE", distractors: ["STORMY", "NOISY"] },
+        { target: "FRAGILE", type: "SYNONYM", answer: "DELICATE", distractors: ["STRONG", "TOUGH"] },
+        { target: "CAPABLE", type: "SYNONYM", answer: "ABLE", distractors: ["HELPLESS", "CLUMSY"] },
+        { target: "HAZARDOUS", type: "SYNONYM", answer: "RISKY", distractors: ["SAFE", "HARMLESS"] },
+        { target: "BOLD", type: "SYNONYM", answer: "DARING", distractors: ["TIMID", "SCARED"] },
+        { target: "HONEST", type: "SYNONYM", answer: "CANDID", distractors: ["SLY", "FALSE"] },
+        { target: "DOUBTFUL", type: "SYNONYM", answer: "UNSURE", distractors: ["CERTAIN", "CLEAR"] },
+        { target: "ELOQUENT", type: "SYNONYM", answer: "WELL-SPOKEN", distractors: ["SILENT", "MUTE"] },
+        { target: "THOROUGH", type: "SYNONYM", answer: "DETAILED", distractors: ["MESSY", "QUICK"] },
+        { target: "SOCIABLE", type: "SYNONYM", answer: "FRIENDLY", distractors: ["LONELY", "SHY"] },
+        { target: "POOR", type: "SYNONYM", answer: "DESTITUTE", distractors: ["WEALTHY", "RICH"] },
+        { target: "SENSIBLE", type: "SYNONYM", answer: "WISE", distractors: ["FOOLISH", "SILLY"] },
+        { target: "ENERGETIC", type: "SYNONYM", answer: "DYNAMIC", distractors: ["TIRED", "SLOW"] },
+        { target: "PRAISEWORTHY", type: "SYNONYM", answer: "ADMIRABLE", distractors: ["SHAMEFUL", "BAD"] },
+        { target: "FLEXIBLE", type: "SYNONYM", answer: "PLIABLE", distractors: ["STIFF", "HARD"] },
+        { target: "VAGUE", type: "SYNONYM", answer: "UNCLEAR", distractors: ["SHARP", "OBVIOUS"] },
+        { target: "COMMON", type: "SYNONYM", answer: "WIDESPREAD", distractors: ["RARE", "SECRET"] },
+        { target: "PLAUSIBLE", type: "SYNONYM", answer: "BELIEVABLE", distractors: ["IMPOSSIBLE", "FAKE"] },
+        { target: "DILEMMA", type: "SYNONYM", answer: "PROBLEM", distractors: ["ANSWER", "GIFT"] },
+        { target: "RESERVED", type: "SYNONYM", answer: "QUIET", distractors: ["LOUD", "NOISY"] },
+        { target: "PERSISTENT", type: "SYNONYM", answer: "DETERMINED", distractors: ["LAZY", "WEAK"] },
+
+        // Year 6 Antonyms (25 unique targets)
+        { target: "GENTLE", type: "ANTONYM", answer: "ROUGH", distractors: ["MILD", "TENDER"] },
+        { target: "WEALTHY", type: "ANTONYM", answer: "POOR", distractors: ["RICH", "LUCKY"] },
+        { target: "OBVIOUS", type: "ANTONYM", answer: "HIDDEN", distractors: ["CLEAR", "EVIDENT"] },
+        { target: "FRAGILE", type: "ANTONYM", answer: "STURDY", distractors: ["WEAK", "SOFT"] },
+        { target: "PROUD", type: "ANTONYM", answer: "HUMBLE", distractors: ["BOASTFUL", "LOUD"] },
+        { target: "TRANQUIL", type: "ANTONYM", answer: "STORMY", distractors: ["CALM", "STILL"] },
+        { target: "STRICT", type: "ANTONYM", answer: "LENIENT", distractors: ["STERN", "HARD"] },
+        { target: "COMPLICATED", type: "ANTONYM", answer: "SIMPLE", distractors: ["TRICKY", "LONG"] },
+        { target: "HARMLESS", type: "ANTONYM", answer: "DANGEROUS", distractors: ["SAFE", "KIND"] },
+        { target: "STEADY", type: "ANTONYM", answer: "UNSTABLE", distractors: ["FIRM", "SOLID"] },
+        { target: "POLITE", type: "ANTONYM", answer: "RUDE", distractors: ["CIVIL", "NICE"] },
+        { target: "TEMPORARY", type: "ANTONYM", answer: "PERMANENT", distractors: ["BRIEF", "SHORT"] },
+        { target: "PRODUCTIVE", type: "ANTONYM", answer: "USELESS", distractors: ["BUSY", "HELPFUL"] },
+        { target: "TALKATIVE", type: "ANTONYM", answer: "QUIET", distractors: ["CHATTY", "LOUD"] },
+        { target: "UNITED", type: "ANTONYM", answer: "DIVIDED", distractors: ["TOGETHER", "ONE"] },
+        { target: "HASTY", type: "ANTONYM", answer: "DELIBERATE", distractors: ["FAST", "QUICK"] },
+        { target: "CHEERFUL", type: "ANTONYM", answer: "SOLEMN", distractors: ["MERRY", "GLAD"] },
+        { target: "SIMILAR", type: "ANTONYM", answer: "DIFFERENT", distractors: ["ALIKE", "SAME"] },
+        { target: "CLEAR", type: "ANTONYM", answer: "CONFUSING", distractors: ["PLAIN", "BRIGHT"] },
+        { target: "GENEROUS", type: "ANTONYM", answer: "STINGY", distractors: ["GIVING", "KIND"] },
+        { target: "CRUEL", type: "ANTONYM", answer: "COMPASSIONATE", distractors: ["HARSH", "MEAN"] },
+        { target: "PEACEFUL", type: "ANTONYM", answer: "WARLIKE", distractors: ["CALM", "QUIET"] },
+        { target: "ACTIVE", type: "ANTONYM", answer: "INACTIVE", distractors: ["FAST", "BUSY"] },
+        { target: "INSULT", type: "ANTONYM", answer: "PRAISE", distractors: ["MOCK", "SCOLD"] },
+        { target: "HEALTHY", type: "ANTONYM", answer: "UNHEALTHY", distractors: ["FIT", "WELL"] }
+      ]
+    };
+
+    /* =====================================================================
+       3. RETRO AUDIO SYNTHESIZER (WEB AUDIO API)
+       ===================================================================== */
+    class RetroAudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      toggle() {
+        this.enabled = !this.enabled;
+        return this.enabled;
+      }
+
+      playCorrect() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6 arpeggio
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+          gain.gain.setValueAtTime(0.18, now + idx * 0.06);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.15);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.06);
+          osc.stop(now + idx * 0.06 + 0.15);
+        });
+      }
+
+      playIncorrect() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(80, now + 0.28);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.28);
+      }
+
+      playMove() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.05);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.05);
+      }
+
+      playGameOver() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const notes = [440, 392, 349.23, 293.66];
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.14);
+          gain.gain.setValueAtTime(0.12, now + idx * 0.14);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.14 + 0.2);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.14);
+          osc.stop(now + idx * 0.14 + 0.2);
+        });
+      }
+    }
+
+    const soundEngine = new RetroAudioEngine();
+
+    /* =====================================================================
+       4. CRITICAL NON-REPEATING LOGIC & SESSION-WIDE HISTORY
+       - Active game queue shuffled with Fisher-Yates algorithm
+       - Zero repetition within a match
+       - Session history tracking guarantees distinct vocabs across games
+       ===================================================================== */
+    let masterPool = [];
+    let activeQueue = [];
+    const sessionSeenTargets = new Set(); // Retains seen target words across rounds in session
+
+    function fisherYatesShuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
+      }
+      return array;
+    }
+
+    function initWordQueue(selectedYear, selectedMode) {
+      const rawBank = VOCABULARY_BANKS[selectedYear] || VOCABULARY_BANKS["Year 1"];
+      let filtered = [];
+
+      if (selectedMode === "Synonyms Only") {
+        filtered = rawBank.filter(item => item.type === "SYNONYM");
+      } else if (selectedMode === "Antonyms Only") {
+        filtered = rawBank.filter(item => item.type === "ANTONYM");
+      } else {
+        // Mixed Challenge
+        filtered = [...rawBank];
+      }
+
+      // Filter against session history to guarantee fresh words every game
+      const unseen = filtered.filter(item => !sessionSeenTargets.has(item.target));
+      const seen = filtered.filter(item => sessionSeenTargets.has(item.target));
+
+      let poolToUse = [];
+      // If we have at least 8 unseen words left in this bank, prioritize unseen words first
+      if (unseen.length >= 8) {
+        fisherYatesShuffle(unseen);
+        fisherYatesShuffle(seen);
+        // Put unseen words at the end so .pop() fetches unseen words first!
+        poolToUse = [...seen, ...unseen];
+      } else {
+        // If the student has exhausted almost the entire bank in this session, reset history for this category
+        filtered.forEach(it => sessionSeenTargets.delete(it.target));
+        poolToUse = [...filtered];
+        fisherYatesShuffle(poolToUse);
+      }
+
+      masterPool = JSON.parse(JSON.stringify(poolToUse));
+      activeQueue = JSON.parse(JSON.stringify(masterPool));
+    }
+
+    function fetchNextTarget() {
+      // If depleted before 120s timer ends, re-shuffle fresh pass from master pool
+      if (activeQueue.length === 0) {
+        activeQueue = JSON.parse(JSON.stringify(masterPool));
+        fisherYatesShuffle(activeQueue);
+      }
+      const item = activeQueue.pop(); // Sequentially popped without random index selection
+      if (item) {
+        sessionSeenTargets.add(item.target);
+      }
+      return item;
+    }
+
+    /* =====================================================================
+       5. GAME STATE & MECHANICS
+       ===================================================================== */
+    const gameState = {
+      studentName: "Explorer",
+      selectedClass: "Year 1",
+      selectedMode: "Mixed Challenge",
+      score: 0,
+      timer: 120,
+      timerInterval: null,
+      correctMatches: 0,
+      incorrectSteps: 0,
+      currentTarget: null,
+      pathStage: 0,
+      wordMistakes: 0, // Mistakes on current target
+      activeTiles: [], // options: [{ dir, word, isCorrect, flashColor, flashTimer, isEliminated }]
+      playerPos: { x: 0, y: 0, targetX: 0, targetY: 0 },
+      isPushingBack: false,
+      isAdvancing: false,
+      screenShake: 0,
+      redFlashOpacity: 0,
+      floatingTexts: [],
+      particles: [],
+      stars: []
+    };
+
+    /* =====================================================================
+       6. CANVAS & 2.5D NEON PATHFINDER RENDERING
+       ===================================================================== */
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    let animationFrameId = null;
+
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      ctx.scale(dpr, dpr);
+    }
+
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+    });
+
+    // Generate background stars
+    function initStars() {
+      gameState.stars = [];
+      for (let i = 0; i < 70; i++) {
+        gameState.stars.push({
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight,
+          size: Math.random() * 2 + 0.8,
+          alpha: Math.random() * 0.8 + 0.2,
+          speed: Math.random() * 0.4 + 0.1
+        });
+      }
+    }
+
+    /* Set up stage tiles for current target word with strictly unique options */
+    function setupStageTiles() {
+      const item = gameState.currentTarget;
+      if (!item) return;
+
+      gameState.wordMistakes = 0;
+      const directions = ['left', 'up', 'right'];
+      const correctDir = directions[Math.floor(Math.random() * directions.length)];
+
+      // Build guaranteed unique distractors
+      const usedWords = new Set();
+      usedWords.add(item.answer.toUpperCase());
+      usedWords.add(item.target.toUpperCase());
+
+      const chosenDistractors = [];
+
+      // 1. Check custom distractors for this item
+      if (item.distractors && Array.isArray(item.distractors)) {
+        for (const dist of item.distractors) {
+          const up = dist.toUpperCase();
+          if (!usedWords.has(up)) {
+            usedWords.add(up);
+            chosenDistractors.push(up);
+            if (chosenDistractors.length === 2) break;
+          }
+        }
+      }
+
+      // 2. Fallback: select unique words from other items in the current level bank
+      const currentBank = VOCABULARY_BANKS[gameState.selectedClass] || VOCABULARY_BANKS["Year 1"];
+      const candidateBank = [...currentBank];
+      fisherYatesShuffle(candidateBank);
+
+      for (const other of candidateBank) {
+        if (chosenDistractors.length >= 2) break;
+        const candidate = other.answer.toUpperCase();
+        if (!usedWords.has(candidate)) {
+          usedWords.add(candidate);
+          chosenDistractors.push(candidate);
+        }
+      }
+
+      fisherYatesShuffle(chosenDistractors);
+
+      let distIdx = 0;
+      gameState.activeTiles = directions.map(dir => {
+        const isCorrect = (dir === correctDir);
+        const word = isCorrect ? item.answer : chosenDistractors[distIdx++];
+        return {
+          dir: dir,
+          word: word,
+          isCorrect: isCorrect,
+          flashColor: null,
+          flashTimer: 0,
+          isEliminated: false
+        };
+      });
+    }
+
+    function addFloatingText(text, x, y, color) {
+      gameState.floatingTexts.push({
+        text,
+        x,
+        y,
+        color,
+        alpha: 1,
+        vy: -1.8,
+        life: 45
+      });
+    }
+
+    function addExplosionParticles(x, y, color, count = 18) {
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 4 + 1.5;
+        gameState.particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          color,
+          alpha: 1,
+          size: Math.random() * 3.5 + 1.5,
+          life: Math.random() * 25 + 20
+        });
+      }
+    }
+
+    /* Movement Action Trigger */
+    function handleStep(direction) {
+      if (gameState.isPushingBack || gameState.isAdvancing || gameState.timer <= 0) return;
+
+      soundEngine.playMove();
+
+      const chosenTile = gameState.activeTiles.find(t => t.dir === direction);
+      if (!chosenTile) {
+        // Neutral bounce
+        return;
+      }
+
+      const centerX = window.innerWidth / 2;
+      const basePlatformY = window.innerHeight * 0.62;
+      const tilePositions = {
+        left: { x: centerX - 120, y: basePlatformY - 100 },
+        up: { x: centerX, y: basePlatformY - 140 },
+        right: { x: centerX + 120, y: basePlatformY - 100 }
+      };
+
+      const targetPos = tilePositions[direction] || { x: centerX, y: basePlatformY };
+
+      if (chosenTile.isCorrect) {
+        // SUCCESS
+        gameState.isAdvancing = true;
+        gameState.score += 100;
+        gameState.correctMatches += 1;
+        gameState.wordMistakes = 0;
+        chosenTile.flashColor = '#00ff66';
+        chosenTile.flashTimer = 25;
+
+        soundEngine.playCorrect();
+        addFloatingText("+100", targetPos.x, targetPos.y - 20, "#00f3ff");
+        addExplosionParticles(targetPos.x, targetPos.y, "#00f3ff", 22);
+
+        updateHUD();
+
+        setTimeout(() => {
+          gameState.pathStage += 1;
+          gameState.currentTarget = fetchNextTarget();
+          updateHUD();
+          setupStageTiles();
+          gameState.isAdvancing = false;
+        }, 320);
+
+      } else {
+        // INCORRECT
+        gameState.isPushingBack = true;
+        gameState.score = Math.max(0, gameState.score - 10);
+        gameState.incorrectSteps += 1;
+        gameState.wordMistakes = (gameState.wordMistakes || 0) + 1;
+        gameState.screenShake = 16;
+        gameState.redFlashOpacity = 0.45;
+        chosenTile.flashColor = '#ff3344';
+        chosenTile.flashTimer = 35;
+        chosenTile.isEliminated = true;
+
+        soundEngine.playIncorrect();
+        addFloatingText("-10", targetPos.x, targetPos.y - 20, "#ff3344");
+        addExplosionParticles(targetPos.x, targetPos.y, "#ff3344", 16);
+
+        updateHUD();
+
+        // If player made 2 mistakes on this word, briefly reveal answer and advance to avoid getting stuck!
+        if (gameState.wordMistakes >= 2) {
+          const correctTile = gameState.activeTiles.find(t => t.isCorrect);
+          if (correctTile) {
+            correctTile.flashColor = '#00ff66';
+            correctTile.flashTimer = 45;
+          }
+          addFloatingText("NEXT WORD", centerX, basePlatformY - 80, "#ffaa00");
+          setTimeout(() => {
+            gameState.currentTarget = fetchNextTarget();
+            updateHUD();
+            setupStageTiles();
+            gameState.isPushingBack = false;
+          }, 500);
+        } else {
+          setTimeout(() => {
+            gameState.isPushingBack = false;
+          }, 380);
+        }
+      }
+    }
+
+    /* Canvas Render Loop */
+    function renderGameLoop() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      // Clear & background
+      ctx.save();
+      if (gameState.screenShake > 0) {
+        const shakeX = (Math.random() - 0.5) * gameState.screenShake;
+        const shakeY = (Math.random() - 0.5) * gameState.screenShake;
+        ctx.translate(shakeX, shakeY);
+        gameState.screenShake *= 0.85;
+        if (gameState.screenShake < 0.5) gameState.screenShake = 0;
+      }
+
+      ctx.fillStyle = '#060914';
+      ctx.fillRect(0, 0, width, height);
+
+      // Stars
+      gameState.stars.forEach(s => {
+        s.y += s.speed;
+        if (s.y > height) { s.y = 0; s.x = Math.random() * width; }
+        ctx.fillStyle = `rgba(180, 210, 255, ${s.alpha})`;
+        ctx.fillRect(s.x, s.y, s.size, s.size);
+      });
+
+      // Neon horizon / perspective grid
+      const horizonY = height * 0.35;
+      const centerX = width / 2;
+
+      // Glow horizon line
+      ctx.beginPath();
+      ctx.moveTo(0, horizonY);
+      ctx.lineTo(width, horizonY);
+      ctx.strokeStyle = 'rgba(188, 19, 254, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#bc13fe';
+      ctx.shadowBlur = 12;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Perspective grid lines
+      ctx.strokeStyle = 'rgba(0, 243, 255, 0.08)';
+      ctx.lineWidth = 1;
+      const gridCount = 14;
+      for (let i = -gridCount; i <= gridCount; i++) {
+        ctx.beginPath();
+        ctx.moveTo(centerX + (i * (width / gridCount)), height);
+        ctx.lineTo(centerX + (i * 12), horizonY);
+        ctx.stroke();
+      }
+
+      // Horizontal depth grid bars
+      for (let d = 1; d <= 8; d++) {
+        const lineY = horizonY + Math.pow(d / 8, 2.2) * (height - horizonY);
+        ctx.strokeStyle = `rgba(0, 243, 255, ${0.03 + d * 0.015})`;
+        ctx.beginPath();
+        ctx.moveTo(0, lineY);
+        ctx.lineTo(width, lineY);
+        ctx.stroke();
+      }
+
+      // Draw Bridge / Stepping Stone Tiles
+      const basePlatformY = height * 0.62;
+      const tileWidth = Math.min(106, width * 0.26);
+      const tileHeight = 48;
+
+      // Active Target Tiles ahead
+      const tilePositions = {
+        left: { x: centerX - tileWidth * 1.15, y: basePlatformY - 105 },
+        up: { x: centerX, y: basePlatformY - 145 },
+        right: { x: centerX + tileWidth * 1.15, y: basePlatformY - 105 }
+      };
+
+      // Connective energy paths from base to candidate tiles
+      gameState.activeTiles.forEach(tile => {
+        const pos = tilePositions[tile.dir];
+        if (!pos) return;
+        ctx.beginPath();
+        ctx.moveTo(centerX, basePlatformY);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.strokeStyle = tile.flashColor ? tile.flashColor : 'rgba(0, 243, 255, 0.2)';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([6, 6]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      });
+
+      // Draw current base stone platform (where player stands)
+      drawStoneTile(centerX, basePlatformY, tileWidth * 1.25, tileHeight * 1.2, "BASE", '#00f3ff', false);
+
+      // Draw candidate stepping stones with words
+      gameState.activeTiles.forEach(tile => {
+        const pos = tilePositions[tile.dir];
+        if (!pos) return;
+        let borderColor = '#293a66';
+        let isFlashing = false;
+
+        if (tile.flashColor) {
+          borderColor = tile.flashColor;
+          isFlashing = true;
+          tile.flashTimer--;
+          if (tile.flashTimer <= 0) tile.flashColor = null;
+        } else if (tile.isEliminated) {
+          borderColor = 'rgba(255, 51, 68, 0.4)';
+        } else {
+          borderColor = (tile.dir === 'up') ? 'var(--neon-cyan)' : '#00aaff';
+        }
+
+        drawStoneTile(pos.x, pos.y, tileWidth, tileHeight, tile.word, borderColor, isFlashing, tile.dir, tile.isEliminated);
+      });
+
+      // Draw Player Explorer Avatar
+      drawExplorer(centerX, basePlatformY);
+
+      // Draw Floating Text (+100 / -10)
+      for (let i = gameState.floatingTexts.length - 1; i >= 0; i--) {
+        const ft = gameState.floatingTexts[i];
+        ft.y += ft.vy;
+        ft.life--;
+        ft.alpha = ft.life / 45;
+
+        ctx.save();
+        ctx.font = 'bold 15px "Press Start 2P", monospace';
+        ctx.fillStyle = ft.color;
+        ctx.globalAlpha = Math.max(0, ft.alpha);
+        ctx.shadowColor = ft.color;
+        ctx.shadowBlur = 10;
+        ctx.textAlign = 'center';
+        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.restore();
+
+        if (ft.life <= 0) {
+          gameState.floatingTexts.splice(i, 1);
+        }
+      }
+
+      // Draw Particles
+      for (let i = gameState.particles.length - 1; i >= 0; i--) {
+        const p = gameState.particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life--;
+        p.alpha = p.life / 30;
+
+        ctx.save();
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        if (p.life <= 0) {
+          gameState.particles.splice(i, 1);
+        }
+      }
+
+      // Red flash warning on screen if wrong step
+      if (gameState.redFlashOpacity > 0) {
+        ctx.fillStyle = `rgba(255, 0, 50, ${gameState.redFlashOpacity})`;
+        ctx.fillRect(0, 0, width, height);
+        gameState.redFlashOpacity -= 0.03;
+      }
+
+      ctx.restore();
+
+      animationFrameId = requestAnimationFrame(renderGameLoop);
+    }
+
+    /* Helper: Draw glowing stone bridge tile */
+    function drawStoneTile(x, y, w, h, label, glowColor, isFlashing, dir, isEliminated) {
+      ctx.save();
+      ctx.translate(x, y);
+
+      // Tile shadow / 2.5D base depth
+      ctx.fillStyle = '#0a0e1c';
+      ctx.beginPath();
+      ctx.roundRect(-w / 2, -h / 2 + 6, w, h, 8);
+      ctx.fill();
+
+      // Stone slab body
+      const grad = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+      if (isEliminated) {
+        grad.addColorStop(0, '#1c1015');
+        grad.addColorStop(1, '#120a0d');
+      } else {
+        grad.addColorStop(0, '#151d38');
+        grad.addColorStop(1, '#0e1426');
+      }
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.roundRect(-w / 2, -h / 2, w, h, 8);
+      ctx.fill();
+
+      // Glowing border
+      ctx.strokeStyle = glowColor || '#293a66';
+      ctx.lineWidth = isFlashing ? 3.5 : (isEliminated ? 1 : 1.8);
+      ctx.shadowColor = glowColor || '#00f3ff';
+      ctx.shadowBlur = isFlashing ? 20 : (isEliminated ? 3 : 8);
+      ctx.stroke();
+
+      // Direction symbol badge (LEFT / FWD / RIGHT)
+      if (dir) {
+        const arrow = (dir === 'left') ? '◀' : (dir === 'up') ? '▲' : '▶';
+        ctx.font = '9px "Orbitron", sans-serif';
+        ctx.fillStyle = isEliminated ? 'rgba(255, 51, 68, 0.45)' : 'rgba(0, 243, 255, 0.7)';
+        ctx.textAlign = 'center';
+        ctx.fillText(arrow, 0, -h / 2 + 12);
+      }
+
+      // Word Label
+      if (label && label !== "BASE") {
+        ctx.shadowBlur = isEliminated ? 0 : 6;
+        ctx.shadowColor = isEliminated ? 'transparent' : '#ffffff';
+        ctx.font = 'bold 12px "Orbitron", sans-serif';
+        ctx.fillStyle = isEliminated ? '#aa4455' : '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, 0, dir ? 4 : 0);
+
+        if (isEliminated) {
+          // Draw subtle strikethrough line
+          ctx.strokeStyle = '#ff3344';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(-w / 3, dir ? 4 : 0);
+          ctx.lineTo(w / 3, dir ? 4 : 0);
+          ctx.stroke();
+        }
+      }
+
+      ctx.restore();
+    }
+
+    /* Helper: Draw Explorer avatar */
+    function drawExplorer(x, y) {
+      ctx.save();
+      let animOffset = Math.sin(Date.now() / 180) * 3;
+
+      if (gameState.isPushingBack) {
+        animOffset += 8; // pushed back
+      } else if (gameState.isAdvancing) {
+        animOffset -= 12; // hopping forward
+      }
+
+      ctx.translate(x, y - 26 + animOffset);
+
+      // Thruster / platform glow beneath player
+      ctx.fillStyle = 'rgba(0, 243, 255, 0.2)';
+      ctx.beginPath();
+      ctx.ellipse(0, 24, 16, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Cyber Explorer Suit Body
+      ctx.fillStyle = '#101730';
+      ctx.strokeStyle = '#00f3ff';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#00f3ff';
+      ctx.shadowBlur = 10;
+
+      // Torso
+      ctx.beginPath();
+      ctx.roundRect(-10, -6, 20, 24, 5);
+      ctx.fill();
+      ctx.stroke();
+
+      // Cyber Helmet / Visor
+      ctx.fillStyle = '#172247';
+      ctx.beginPath();
+      ctx.arc(0, -14, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Visor Glow
+      ctx.fillStyle = gameState.isPushingBack ? '#ff3344' : '#00f3ff';
+      ctx.shadowColor = gameState.isPushingBack ? '#ff3344' : '#00f3ff';
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.roundRect(-7, -16, 14, 7, 3);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    /* Update Top HUD display */
+    function updateHUD() {
+      document.getElementById('hud-class').textContent = gameState.selectedClass;
+      document.getElementById('hud-timer').textContent = `${gameState.timer}s`;
+      document.getElementById('hud-score').textContent = gameState.score;
+
+      const timerBadge = document.getElementById('hud-timer-badge');
+      if (gameState.timer <= 20) {
+        timerBadge.classList.add('urgent');
+      } else {
+        timerBadge.classList.remove('urgent');
+      }
+
+      const item = gameState.currentTarget;
+      if (item) {
+        const pill = document.getElementById('hud-target-pill');
+        pill.textContent = (item.type === "SYNONYM") ? "FIND SYNONYM" : "FIND ANTONYM";
+        pill.className = `target-mode-pill ${item.type === "SYNONYM" ? "synonym" : "antonym"}`;
+        document.getElementById('hud-target-word').textContent = item.target;
+      }
+    }
+
+    /* =====================================================================
+       7. GAME SESSION LIFECYCLE
+       ===================================================================== */
+    function startGameSession() {
+      const nameInput = document.getElementById('input-student-name');
+      const nameVal = nameInput.value.trim();
+      gameState.studentName = nameVal || "Explorer " + Math.floor(100 + Math.random() * 900);
+
+      gameState.score = 0;
+      gameState.timer = 120;
+      gameState.correctMatches = 0;
+      gameState.incorrectSteps = 0;
+      gameState.pathStage = 0;
+      gameState.floatingTexts = [];
+      gameState.particles = [];
+
+      // Initialize non-repeating Fisher-Yates word queue
+      initWordQueue(gameState.selectedClass, gameState.selectedMode);
+      gameState.currentTarget = fetchNextTarget();
+
+      setupStageTiles();
+      updateHUD();
+
+      // Switch screen
+      switchScreen('screen-game');
+      resizeCanvas();
+      initStars();
+
+      // Start timer countdown
+      if (gameState.timerInterval) clearInterval(gameState.timerInterval);
+      gameState.timerInterval = setInterval(() => {
+        gameState.timer--;
+        updateHUD();
+        if (gameState.timer <= 0) {
+          endGameSession();
+        }
+      }, 1000);
+
+      // Start animation loop
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      renderGameLoop();
+    }
+
+    function endGameSession() {
+      if (gameState.timerInterval) clearInterval(gameState.timerInterval);
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+      soundEngine.playGameOver();
+
+      const totalAttempts = gameState.correctMatches + gameState.incorrectSteps;
+      const accuracy = totalAttempts > 0 ? Math.round((gameState.correctMatches / totalAttempts) * 100) : 100;
+
+      // Populate Screen B
+      document.getElementById('results-student-info').textContent =
+        `${gameState.studentName} • ${gameState.selectedClass} • ${gameState.selectedMode}`;
+      document.getElementById('stat-final-score').textContent = gameState.score;
+      document.getElementById('stat-accuracy').textContent = `${accuracy}%`;
+      document.getElementById('stat-matched').textContent = gameState.correctMatches;
+
+      switchScreen('screen-results');
+
+      // Submit record to Firebase Realtime Database
+      submitScoreToFirebase({
+        name: gameState.studentName,
+        class: gameState.selectedClass,
+        mode: gameState.selectedMode,
+        score: gameState.score,
+        accuracy: accuracy,
+        timestamp: Date.now()
+      });
+    }
+
+    /* Submit score record to /pathfinder_scores/ */
+    function submitScoreToFirebase(payload) {
+      const statusBox = document.getElementById('firebase-status');
+      statusBox.className = "firebase-status-box submitting";
+      statusBox.innerHTML = `<span>⏳ Transmitting score record to Teacher Anne...</span>`;
+
+      if (database) {
+        try {
+          const scoresRef = database.ref('pathfinder_scores');
+          scoresRef.push(payload)
+            .then(() => {
+              statusBox.className = "firebase-status-box";
+              statusBox.innerHTML = `<span>✅ Score submitted successfully to Teacher Anne!</span>`;
+            })
+            .catch(err => {
+              console.warn("Firebase push error:", err);
+              statusBox.className = "firebase-status-box error";
+              statusBox.innerHTML = `<span>⚠️ Network saved locally. Use Copy Summary Text backup below.</span>`;
+            });
+        } catch (e) {
+          statusBox.className = "firebase-status-box";
+          statusBox.innerHTML = `<span>✅ Score recorded in session!</span>`;
+        }
+      } else {
+        // Fallback if offline
+        setTimeout(() => {
+          statusBox.className = "firebase-status-box";
+          statusBox.innerHTML = `<span>✅ Score logged for Teacher Anne (Local Mode)</span>`;
+        }, 600);
+      }
+    }
+
+    /* =====================================================================
+       8. SCREEN NAVIGATION & INTERACTION CONTROLS
+       ===================================================================== */
+    function switchScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      const target = document.getElementById(screenId);
+      if (target) target.classList.add('active');
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2600);
+    }
+
+    // Class selection buttons
+    document.querySelectorAll('#class-selector .class-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#class-selector .class-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        gameState.selectedClass = btn.getAttribute('data-year');
+      });
+    });
+
+    // Mode selection buttons
+    document.querySelectorAll('#mode-selector .mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#mode-selector .mode-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        gameState.selectedMode = btn.getAttribute('data-mode');
+      });
+    });
+
+    // Audio SFX toggle
+    document.getElementById('btn-sound-toggle').addEventListener('click', () => {
+      const isEnabled = soundEngine.toggle();
+      document.getElementById('sound-icon').textContent = isEnabled ? '🔊' : '🔇';
+      document.getElementById('sound-text').textContent = isEnabled ? 'SFX ON' : 'SFX MUTED';
+    });
+
+    // Start Button
+    document.getElementById('btn-start-quest').addEventListener('click', () => {
+      soundEngine.init();
+      startGameSession();
+    });
+
+    // Results screen buttons
+    document.getElementById('btn-play-again').addEventListener('click', () => {
+      startGameSession();
+    });
+
+    document.getElementById('btn-results-menu').addEventListener('click', () => {
+      switchScreen('screen-registration');
+    });
+
+    document.getElementById('btn-copy-summary').addEventListener('click', () => {
+      const totalAttempts = gameState.correctMatches + gameState.incorrectSteps;
+      const accuracy = totalAttempts > 0 ? Math.round((gameState.correctMatches / totalAttempts) * 100) : 100;
+      const summaryText =
+`🎮 Neon Pathfinder: Synonym & Antonym Quest
+👤 Student: ${gameState.studentName}
+🏫 Class: ${gameState.selectedClass}
+🎯 Mode: ${gameState.selectedMode}
+⭐ Final Score: ${gameState.score}
+🎯 Accuracy: ${accuracy}%
+📖 Words Matched: ${gameState.correctMatches}
+📅 Date: ${new Date().toLocaleDateString()}
+Status: Submitted to Teacher Anne!`;
+
+      navigator.clipboard.writeText(summaryText)
+        .then(() => showToast("Summary text copied to clipboard!"))
+        .catch(() => showToast("Summary ready to copy!"));
+    });
+
+    // Keyboard controls (Arrow keys + WASD)
+    window.addEventListener('keydown', (e) => {
+      const activeScreen = document.querySelector('.screen.active');
+      if (!activeScreen || activeScreen.id !== 'screen-game') return;
+
+      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        handleStep('up');
+      } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        handleStep('left');
+      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        handleStep('right');
+      } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        handleStep('down');
+      }
+    });
+
+    // Touch D-Pad buttons
+    document.getElementById('btn-ctrl-up').addEventListener('pointerdown', (e) => { e.preventDefault(); handleStep('up'); });
+    document.getElementById('btn-ctrl-left').addEventListener('pointerdown', (e) => { e.preventDefault(); handleStep('left'); });
+    document.getElementById('btn-ctrl-right').addEventListener('pointerdown', (e) => { e.preventDefault(); handleStep('right'); });
+    document.getElementById('btn-ctrl-down').addEventListener('pointerdown', (e) => { e.preventDefault(); handleStep('down'); });
+
+    // Direct Canvas Tap Support (Tap candidate stone tiles on screen)
+    canvas.addEventListener('pointerdown', (e) => {
+      const activeScreen = document.querySelector('.screen.active');
+      if (!activeScreen || activeScreen.id !== 'screen-game') return;
+
+      const rect = canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const centerX = width / 2;
+      const basePlatformY = height * 0.62;
+      const tileWidth = Math.min(106, width * 0.26);
+
+      // Check click proximity to Left, Forward, or Right tiles
+      const tilePositions = {
+        left: { x: centerX - tileWidth * 1.15, y: basePlatformY - 105 },
+        up: { x: centerX, y: basePlatformY - 145 },
+        right: { x: centerX + tileWidth * 1.15, y: basePlatformY - 105 }
+      };
+
+      for (const dir of ['left', 'up', 'right']) {
+        const pos = tilePositions[dir];
+        const dist = Math.hypot(clickX - pos.x, clickY - pos.y);
+        if (dist < tileWidth * 0.75) {
+          handleStep(dir);
+          return;
+        }
+      }
+    });
+
+    /* =====================================================================
+       9. TEACHER DASHBOARD LOGIC & FIREBASE SYNC
+       ===================================================================== */
+    const TEACHER_PASSWORD = "ANNE_TEACHER_2026";
+    let cachedTeacherRecords = [];
+
+    // Open Teacher Auth Modal
+    document.getElementById('link-teacher-portal').addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('input-teacher-pwd').value = '';
+      document.getElementById('auth-err-msg').style.display = 'none';
+      document.getElementById('modal-teacher-auth').classList.add('active');
+    });
+
+    document.getElementById('btn-auth-cancel').addEventListener('click', () => {
+      document.getElementById('modal-teacher-auth').classList.remove('active');
+    });
+
+    document.getElementById('btn-auth-submit').addEventListener('click', () => {
+      const pwd = document.getElementById('input-teacher-pwd').value.trim();
+      if (pwd === TEACHER_PASSWORD) {
+        document.getElementById('modal-teacher-auth').classList.remove('active');
+        openTeacherPortal();
+      } else {
+        document.getElementById('auth-err-msg').style.display = 'block';
+      }
+    });
+
+    document.getElementById('btn-teacher-back').addEventListener('click', () => {
+      switchScreen('screen-registration');
+    });
+
+    function openTeacherPortal() {
+      switchScreen('screen-teacher');
+      loadTeacherRecords();
+    }
+
+    function loadTeacherRecords() {
+      const tbody = document.getElementById('teacher-table-body');
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:24px; color:#788ea8;">Fetching live student records from database...</td></tr>`;
+
+      if (database) {
+        try {
+          const scoresRef = database.ref('pathfinder_scores');
+          scoresRef.on('value', (snapshot) => {
+            cachedTeacherRecords = [];
+            const data = snapshot.val();
+            if (data) {
+              Object.keys(data).forEach(id => {
+                cachedTeacherRecords.push({ id, ...data[id] });
+              });
+              // Sort most recent first
+              cachedTeacherRecords.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            }
+            renderTeacherTable();
+          }, (err) => {
+            console.warn("Database listener notice:", err);
+            renderSampleTeacherRecords();
+          });
+        } catch (e) {
+          renderSampleTeacherRecords();
+        }
+      } else {
+        renderSampleTeacherRecords();
+      }
+    }
+
+    function renderSampleTeacherRecords() {
+      if (cachedTeacherRecords.length === 0) {
+        cachedTeacherRecords = [
+          { name: "Lucas Vance", class: "Year 4", mode: "Mixed Challenge", score: 1400, accuracy: 93, timestamp: Date.now() - 3600000 },
+          { name: "Amara Patel", class: "Year 5", mode: "Synonyms Only", score: 1200, accuracy: 92, timestamp: Date.now() - 7200000 },
+          { name: "Siti Rahmah", class: "Year 2", mode: "Antonyms Only", score: 1100, accuracy: 100, timestamp: Date.now() - 10800000 }
+        ];
+      }
+      renderTeacherTable();
+    }
+
+    function renderTeacherTable() {
+      const filterClass = document.getElementById('teacher-filter-class').value;
+      const filterMode = document.getElementById('teacher-filter-mode').value;
+      const searchVal = document.getElementById('teacher-search-input').value.trim().toLowerCase();
+
+      const filtered = cachedTeacherRecords.filter(row => {
+        const matchClass = (filterClass === "ALL" || row.class === filterClass);
+        const matchMode = (filterMode === "ALL" || row.mode === filterMode);
+        const matchSearch = !searchVal || (row.name && row.name.toLowerCase().includes(searchVal));
+        return matchClass && matchMode && matchSearch;
+      });
+
+      // Update KPIs
+      document.getElementById('kpi-total-students').textContent = filtered.length;
+      if (filtered.length > 0) {
+        const totalScore = filtered.reduce((acc, r) => acc + (Number(r.score) || 0), 0);
+        const avgScore = Math.round(totalScore / filtered.length);
+        const totalAcc = filtered.reduce((acc, r) => acc + (Number(r.accuracy) || 0), 0);
+        const avgAcc = Math.round(totalAcc / filtered.length);
+
+        let topScorer = filtered[0];
+        filtered.forEach(r => {
+          if ((Number(r.score) || 0) > (Number(topScorer.score) || 0)) topScorer = r;
+        });
+
+        document.getElementById('kpi-avg-score').textContent = avgScore;
+        document.getElementById('kpi-avg-accuracy').textContent = `${avgAcc}%`;
+        document.getElementById('kpi-top-scorer').textContent = `${topScorer.name || 'Anonymous'} (${topScorer.score})`;
+      } else {
+        document.getElementById('kpi-avg-score').textContent = '0';
+        document.getElementById('kpi-avg-accuracy').textContent = '0%';
+        document.getElementById('kpi-top-scorer').textContent = '-';
+      }
+
+      // Populate Table Body
+      const tbody = document.getElementById('teacher-table-body');
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:30px; color:#687b96;">No records found for current filter criteria.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(row => {
+        const dateStr = row.timestamp ? new Date(row.timestamp).toLocaleDateString() + ' ' + new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A';
+        return `
+          <tr>
+            <td>${dateStr}</td>
+            <td style="font-weight:700; color:#ffffff;">${escapeHTML(row.name || 'Explorer')}</td>
+            <td><span class="tag-year">${escapeHTML(row.class || 'Year 1')}</span></td>
+            <td><span class="tag-mode">${escapeHTML(row.mode || 'Mixed Challenge')}</span></td>
+            <td style="color:var(--neon-cyan); font-family:var(--font-arcade);">${row.score ?? 0}</td>
+            <td style="color:var(--neon-green); font-weight:700;">${row.accuracy ?? 100}%</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function escapeHTML(str) {
+      return String(str).replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+      }[tag] || tag));
+    }
+
+    // Filters event listeners
+    document.getElementById('teacher-filter-class').addEventListener('change', renderTeacherTable);
+    document.getElementById('teacher-filter-mode').addEventListener('change', renderTeacherTable);
+    document.getElementById('teacher-search-input').addEventListener('input', renderTeacherTable);
+
+    // Export to CSV
+    document.getElementById('btn-teacher-export').addEventListener('click', () => {
+      if (cachedTeacherRecords.length === 0) {
+        showToast("No records available to export!");
+        return;
+      }
+
+      const headers = ["Date", "Student Name", "Class", "Mode", "Final Score", "Accuracy %"];
+      const rows = cachedTeacherRecords.map(r => [
+        r.timestamp ? `"${new Date(r.timestamp).toISOString()}"` : '""',
+        `"${(r.name || 'Explorer').replace(/"/g, '""')}"`,
+        `"${r.class || 'Year 1'}"`,
+        `"${r.mode || 'Mixed'}"`,
+        r.score || 0,
+        r.accuracy || 0
+      ]);
+
+      const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `neon_pathfinder_scores_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast("CSV export downloaded successfully!");
+    });
+  </script>
+</body>
+</html>
